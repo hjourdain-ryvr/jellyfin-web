@@ -5,6 +5,10 @@ import { ServerConnections } from 'lib/jellyfin-apiclient';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormGroup from '@mui/material/FormGroup';
+import FormHelperText from '@mui/material/FormHelperText';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -14,6 +18,18 @@ import { QUERY_KEY, useConfiguration } from 'hooks/useConfiguration';
 import Loading from 'components/loading/LoadingComponent';
 import { ActionData } from 'types/actionData';
 import { queryClient } from 'utils/query/queryClient';
+import type { ServerConfiguration } from '@jellyfin/sdk/lib/generated-client/models/server-configuration';
+
+/**
+ * Pre-packaged HLS server settings. These fields are added by the pre-packaged HLS server patch and
+ * are not yet part of the generated SDK ServerConfiguration model, so they are accessed via this
+ * augmenting type. The runtime configuration object does carry them.
+ */
+type PrePackagedHlsConfig = {
+    EnablePrePackagedHls?: boolean;
+    ForcePrePackagedHls?: boolean;
+    EnablePrePackagedHlsTranscodeFallback?: boolean;
+};
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const api = ServerConnections.getCurrentApi();
@@ -24,6 +40,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const bitrateLimit = formData.get('StreamingBitrateLimit')?.toString();
     config.RemoteClientBitrateLimit = Math.trunc(1e6 * parseFloat(bitrateLimit || '0'));
+
+    const hlsConfig = config as ServerConfiguration & PrePackagedHlsConfig;
+    hlsConfig.EnablePrePackagedHls = formData.get('EnablePrePackagedHls') === 'on';
+    hlsConfig.ForcePrePackagedHls = formData.get('ForcePrePackagedHls') === 'on';
+    hlsConfig.EnablePrePackagedHlsTranscodeFallback = formData.get('EnablePrePackagedHlsTranscodeFallback') === 'on';
 
     await getConfigurationApi(api)
         .updateConfiguration({ serverConfiguration: config });
@@ -47,6 +68,8 @@ export const Component = () => {
     if (isConfigurationPending) {
         return <Loading />;
     }
+
+    const hlsConfig = defaultConfiguration as (ServerConfiguration & PrePackagedHlsConfig) | undefined;
 
     return (
         <Page
@@ -81,6 +104,52 @@ export const Component = () => {
                                 }
                             }}
                         />
+
+                        <FormGroup>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        name='EnablePrePackagedHls'
+                                        defaultChecked={hlsConfig?.EnablePrePackagedHls ?? true}
+                                    />
+                                }
+                                label={globalize.translate('LabelEnablePrePackagedHls')}
+                            />
+                            <FormHelperText>
+                                {globalize.translate('LabelEnablePrePackagedHlsHelp')}
+                            </FormHelperText>
+                        </FormGroup>
+
+                        <FormGroup>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        name='ForcePrePackagedHls'
+                                        defaultChecked={hlsConfig?.ForcePrePackagedHls ?? true}
+                                    />
+                                }
+                                label={globalize.translate('LabelForcePrePackagedHls')}
+                            />
+                            <FormHelperText>
+                                {globalize.translate('LabelForcePrePackagedHlsHelp')}
+                            </FormHelperText>
+                        </FormGroup>
+
+                        <FormGroup>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        name='EnablePrePackagedHlsTranscodeFallback'
+                                        defaultChecked={hlsConfig?.EnablePrePackagedHlsTranscodeFallback ?? false}
+                                    />
+                                }
+                                label={globalize.translate('LabelEnablePrePackagedHlsTranscodeFallback')}
+                            />
+                            <FormHelperText>
+                                {globalize.translate('LabelEnablePrePackagedHlsTranscodeFallbackHelp')}
+                            </FormHelperText>
+                        </FormGroup>
+
                         <Button
                             type='submit'
                             size='large'
